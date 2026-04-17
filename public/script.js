@@ -206,9 +206,9 @@ generateBtn.addEventListener('click', async () => {
             
             const matches = [...item.promptsText.matchAll(/```(?:[\w]*\n)?([\s\S]*?)```/g)];
             if (matches && matches.length > 0) {
-                matches.forEach(m => group.appendChild(createPromptItem(m[1].trim())));
+                matches.forEach((m, idx) => group.appendChild(createPromptItem(m[1].trim(), idx + 1)));
             } else {
-                group.appendChild(createPromptItem(item.promptsText));
+                group.appendChild(createPromptItem(item.promptsText, 1));
             }
             
             prompterResultsList.appendChild(group);
@@ -222,10 +222,16 @@ generateBtn.addEventListener('click', async () => {
     }
 });
 
-function createPromptItem(text) {
+function createPromptItem(text, index) {
     const div = document.createElement('div');
     div.className = 'prompt-item';
-    div.textContent = text;
+    
+    const numBadge = document.createElement('div');
+    numBadge.className = 'prompt-number';
+    numBadge.textContent = index;
+    
+    const content = document.createElement('span');
+    content.textContent = text;
     
     const btn = document.createElement('button');
     btn.className = 'copy-btn';
@@ -237,6 +243,8 @@ function createPromptItem(text) {
         setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 2000);
     };
     
+    div.appendChild(numBadge);
+    div.appendChild(content);
     div.appendChild(btn);
     return div;
 }

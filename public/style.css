@@ -283,11 +283,21 @@ input[type="file"] {
     background-color: #0b0c0f;
     border: 1px solid #2d313a;
     border-radius: 8px;
-    padding: 1rem 3rem 1rem 1rem;
+    padding: 1rem 4rem 1rem 3rem;
     margin-bottom: 0.8rem;
     font-family: monospace;
     font-size: 0.95rem;
     color: #e2e8f0;
+}
+.prompt-number {
+    position: absolute;
+    left: 0.8rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: white;
+    font-weight: 600;
+    font-size: 1rem;
+    opacity: 0.8;
 }
 .copy-btn {
     position: absolute;
