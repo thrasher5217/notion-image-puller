@@ -37,11 +37,11 @@ async function fetchImages() {
 
     try {
         const response = await fetch(`/api/images?date=${encodeURIComponent(date)}`);
-        const data = await response.json();
-
         if (!response.ok) {
-            throw new Error(data.error || 'Failed to fetch images');
+            const textErr = await response.text();
+            throw new Error(`Server returned ${response.status}: ${textErr}`);
         }
+        const data = await response.json();
 
         currentImages = data.images || [];
         currentDate = date;
@@ -190,8 +190,12 @@ generateBtn.addEventListener('click', async () => {
             body: JSON.stringify({ images: prompterImages, count: promptCount.value || 1 })
         });
         
+        if (!res.ok) {
+            const errText = await res.text();
+            throw new Error(`API Error ${res.status}: ${errText}`);
+        }
+        
         const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'API Failed');
         
         prompterStatus.classList.add('hidden');
         prompterResultsContainer.classList.remove('hidden');

@@ -168,37 +168,66 @@ app.post('/api/generate-prompts', async (req, res) => {
             systemPrompt = "Write high quality prompts for the provided image.";
         }
         
-        let allResults = [];
+        res.setHeader('Content-Type', 'application/json');
+        res.write('{"results":[\n');
         
-        for (const imgBase64 of images) {
-            const userText = `Test prompt instruction: Please generate exactly ${count || 1} prompts for this product following the system prompt rules closely. Treat this input as the product to examine.`;
+        const concurrencyLimit = 5;
+        let isFirst = true;
+        
+        for (let i = 0; i < images.length; i += concurrencyLimit) {
+            const chunk = images.slice(i, i + concurrencyLimit);
             
-            const response = await openai.chat.completions.create({
-                model: "gpt-4o",
-                messages: [
-                    { role: "system", content: systemPrompt },
-                    {
-                        role: "user",
-                        content: [
-                            { type: "text", text: userText },
-                            { type: "image_url", image_url: { url: imgBase64 } }
-                        ]
-                    }
-                ],
-                max_tokens: 3000
+            // Keep connection alive while waiting for heavy AI generation
+            const keepAlive = setInterval(() => res.write(' '), 4000);
+            
+            const chunkPromises = chunk.map(async (imgBase64) => {
+                const userText = `Test prompt instruction: Please generate exactly ${count || 1} prompts for this product following the system prompt rules closely. Treat this input as the product to examine.`;
+                try {
+                    const response = await openai.chat.completions.create({
+                        model: "gpt-4o",
+                        messages: [
+                            { role: "system", content: systemPrompt },
+                            {
+                                role: "user",
+                                content: [
+                                    { type: "text", text: userText },
+                                    { type: "image_url", image_url: { url: imgBase64 } }
+                                ]
+                            }
+                        ],
+                        max_tokens: 3000
+                    });
+                    
+                    return {
+                        image: imgBase64,
+                        promptsText: response.choices[0].message.content
+                    };
+                } catch (e) {
+                    console.error("OpenAI fail on image", e.message);
+                    return { image: imgBase64, promptsText: `Error generating: ${e.message}` };
+                }
             });
             
-            allResults.push({
-                image: imgBase64,
-                promptsText: response.choices[0].message.content
-            });
+            const results = await Promise.all(chunkPromises);
+            clearInterval(keepAlive);
+            
+            for (const resultObj of results) {
+                if (!isFirst) res.write(',\n');
+                res.write(JSON.stringify(resultObj));
+                isFirst = false;
+            }
         }
         
-        res.json({ results: allResults });
+        res.write('\n]}');
+        res.end();
         
     } catch (e) {
         console.error("OpenAI Error:", e);
-        res.status(500).json({ error: e.message || "Failed to generate prompts." });
+        if (!res.headersSent) {
+            res.status(500).json({ error: e.message || "Failed to generate prompts." });
+        } else {
+            res.end();
+        }
     }
 });
 
