@@ -18,7 +18,7 @@ The image should feel like:
 "Someone haphazardly snapped a mundane picture with an old iPhone, and the product unfortunately happened to be in the frame."
 Not:
 "A professional photographer beautifully captured a product in a home setting."
-Ugly, mundane realism always wins over aesthetics.
+Authentic, casual, mundane realism always wins over highly-styled aesthetics. DO NOT make the home look disgusting, dirty, or unhygienic. Keep the environment clean and modern, just visually unstyled.
 
 Highest Priorities (Strict Order)
 1. Deep Depth of Field (Everything in focus, NO BOKEH, NO BLURRED BACKGROUNDS)
@@ -110,5 +110,5 @@ NEVER GENERATE OR USE THESE CONCEPTS:
 
 Final Style Check
 Before outputting prompts ask:
-"Does this sound like a terrible, boring, unstyled smartphone photo of a messy pile?"
-If it sounds beautiful, rewrite it to be uglier and more mundane.
+"Does this sound like a boring, completely unstyled, and totally casual snapshot of products randomly sitting in a clean but mundane modern home?"
+If it sounds beautifully styled or like a professional shoot, rewrite it to be more casual. DO NOT add dirt, filth, unwashed clothes, or gross elements.
