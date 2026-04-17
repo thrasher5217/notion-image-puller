@@ -155,7 +155,7 @@ app.post('/api/generate-prompts', async (req, res) => {
         const { images, count } = req.body;
         if (!images || !images.length) return res.status(400).send("No images provided");
         
-        const promptFilePath = path.join(__dirname, '../New Prompter/Prompt Gen V12.txt');
+        const promptFilePath = path.join(__dirname, 'Prompt Gen V12.txt');
         let systemPrompt = '';
         try {
             systemPrompt = fs.readFileSync(promptFilePath, 'utf8');
