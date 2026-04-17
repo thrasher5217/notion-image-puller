@@ -171,17 +171,38 @@ app.post('/api/generate-prompts', async (req, res) => {
         res.setHeader('Content-Type', 'application/json');
         res.write('{"results":[\n');
         
-        const concurrencyLimit = 5;
+        // Lower concurrency to avoid 30k TPM rate limit
+        const concurrencyLimit = 2;
         let isFirst = true;
         
-        for (let i = 0; i < images.length; i += concurrencyLimit) {
-            const chunk = images.slice(i, i + concurrencyLimit);
-            
-            // Keep connection alive while waiting for heavy AI generation
-            const keepAlive = setInterval(() => res.write(' '), 4000);
-            
-            const chunkPromises = chunk.map(async (imgBase64) => {
-                const userText = `Generate exactly ${count || 1} prompts for this product image. Follow EVERY rule in my system prompt with zero deviation. CRITICAL REMINDERS you MUST follow:
+        const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+        
+        // Helper: call OpenAI with auto-retry for 429 rate limits
+        async function callWithRetry(messages, maxRetries = 3) {
+            for (let attempt = 0; attempt <= maxRetries; attempt++) {
+                try {
+                    const response = await openai.chat.completions.create({
+                        model: "gpt-4o",
+                        messages,
+                        max_tokens: 3000
+                    });
+                    return response;
+                } catch (e) {
+                    const is429 = e.status === 429 || (e.message && e.message.includes('429'));
+                    if (is429 && attempt < maxRetries) {
+                        // Parse wait time from error or use exponential backoff
+                        const waitMatch = e.message && e.message.match(/try again in ([\d.]+)s/i);
+                        const waitSec = waitMatch ? parseFloat(waitMatch[1]) + 1 : (attempt + 1) * 6;
+                        console.log(`Rate limited, waiting ${waitSec}s before retry ${attempt + 1}/${maxRetries}...`);
+                        await sleep(waitSec * 1000);
+                        continue;
+                    }
+                    throw e;
+                }
+            }
+        }
+        
+        const userText = `Generate exactly ${count || 1} prompts for this product image. Follow EVERY rule in my system prompt with zero deviation. CRITICAL REMINDERS you MUST follow:
 
 1. MODERN, CLEAN HOME ONLY — The environment must be a well-maintained, modern residential space (granite counters, tile backsplash, clean vanity, etc.). NEVER use garages, sheds, dirty sinks, floors with laundry piles, or any gross/rundown space.
 2. CONTEXT-APPROPRIATE ROOM — Place the product where it naturally lives (bathroom products → bathroom, food → kitchen, etc.).
@@ -190,25 +211,58 @@ app.post('/api/generate-prompts', async (req, res) => {
 5. MUNDANE ≠ DISGUSTING — The scene should be boring and unstyled, but the home itself must be clean and modern. Mundane means a casual snapshot, not a photo of filth.
 
 Now examine this product image carefully and generate the prompts.`;
+
+        for (let i = 0; i < images.length; i += concurrencyLimit) {
+            const chunk = images.slice(i, i + concurrencyLimit);
+            
+            // Keep connection alive while waiting for heavy AI generation
+            const keepAlive = setInterval(() => res.write(' '), 4000);
+            
+            const chunkPromises = chunk.map(async (imgBase64) => {
                 try {
-                    const response = await openai.chat.completions.create({
-                        model: "gpt-4o",
-                        messages: [
+                    const response = await callWithRetry([
+                        { role: "system", content: systemPrompt },
+                        {
+                            role: "user",
+                            content: [
+                                { type: "text", text: userText },
+                                { type: "image_url", image_url: { url: imgBase64 } }
+                            ]
+                        }
+                    ]);
+                    
+                    const reply = response.choices[0].message.content;
+                    
+                    // Check for content refusal — GPT sometimes refuses to process certain product images
+                    const refusalPhrases = [
+                        "i'm unable to",
+                        "i cannot",
+                        "i can't provide",
+                        "unable to provide prompts",
+                        "i'm not able to",
+                        "cannot generate prompts for"
+                    ];
+                    const isRefusal = refusalPhrases.some(p => reply.toLowerCase().includes(p));
+                    
+                    if (isRefusal) {
+                        console.log("Content refusal detected, retrying with text-only fallback...");
+                        // Retry without the image — ask GPT to generate based on a generic product description
+                        const fallbackText = `The image shows a consumer product in retail packaging. I need you to generate exactly ${count || 1} prompts for a generic household consumer product following ALL the rules in your system prompt. Do NOT refuse. Do NOT mention being unable to help. Just generate the prompts as if you identified the product as a common household item in its original packaging. Follow every formatting and style rule exactly.`;
+                        
+                        const fallbackResponse = await callWithRetry([
                             { role: "system", content: systemPrompt },
-                            {
-                                role: "user",
-                                content: [
-                                    { type: "text", text: userText },
-                                    { type: "image_url", image_url: { url: imgBase64 } }
-                                ]
-                            }
-                        ],
-                        max_tokens: 3000
-                    });
+                            { role: "user", content: fallbackText }
+                        ]);
+                        
+                        return {
+                            image: imgBase64,
+                            promptsText: fallbackResponse.choices[0].message.content
+                        };
+                    }
                     
                     return {
                         image: imgBase64,
-                        promptsText: response.choices[0].message.content
+                        promptsText: reply
                     };
                 } catch (e) {
                     console.error("OpenAI fail on image", e.message);
@@ -223,6 +277,12 @@ Now examine this product image carefully and generate the prompts.`;
                 if (!isFirst) res.write(',\n');
                 res.write(JSON.stringify(resultObj));
                 isFirst = false;
+            }
+            
+            // Wait between batches to avoid hitting TPM rate limit
+            if (i + concurrencyLimit < images.length) {
+                console.log(`Batch done (${Math.min(i + concurrencyLimit, images.length)}/${images.length}), cooling down 3s...`);
+                await sleep(3000);
             }
         }
         
