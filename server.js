@@ -181,7 +181,15 @@ app.post('/api/generate-prompts', async (req, res) => {
             const keepAlive = setInterval(() => res.write(' '), 4000);
             
             const chunkPromises = chunk.map(async (imgBase64) => {
-                const userText = `Test prompt instruction: Please generate exactly ${count || 1} prompts for this product following the system prompt rules closely. Treat this input as the product to examine.`;
+                const userText = `Generate exactly ${count || 1} prompts for this product image. Follow EVERY rule in my system prompt with zero deviation. CRITICAL REMINDERS you MUST follow:
+
+1. MODERN, CLEAN HOME ONLY — The environment must be a well-maintained, modern residential space (granite counters, tile backsplash, clean vanity, etc.). NEVER use garages, sheds, dirty sinks, floors with laundry piles, or any gross/rundown space.
+2. CONTEXT-APPROPRIATE ROOM — Place the product where it naturally lives (bathroom products → bathroom, food → kitchen, etc.).
+3. PRODUCT IN BOTTOM HALF — The product must sit in the bottom 50% of the frame. The top 40-50% should be open negative space (wall, ceiling, countertop background) for text overlay.
+4. DEEP DEPTH OF FIELD — Everything in sharp focus, f/16 or f/22. NO bokeh, NO blurred backgrounds.
+5. MUNDANE ≠ DISGUSTING — The scene should be boring and unstyled, but the home itself must be clean and modern. Mundane means a casual snapshot, not a photo of filth.
+
+Now examine this product image carefully and generate the prompts.`;
                 try {
                     const response = await openai.chat.completions.create({
                         model: "gpt-4o",
