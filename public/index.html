@@ -10,11 +10,15 @@
 <body>
     <div class="app-container">
         <header>
-            <h1>Notion Image Puller</h1>
-            <p>Enter a date below (e.g. 1/20 or today) to pull images from your Notion page.</p>
+            <h1 id="mainTitle">Notion Image Puller</h1>
+            <div class="tabs">
+                <button class="tab-btn active" data-target="puller-tab">Notion Puller</button>
+                <button class="tab-btn" data-target="prompter-tab">Prompter</button>
+            </div>
+            <p id="headerDesc">Enter a date below (e.g. 1/20 or today) to pull images from your Notion page.</p>
         </header>
 
-        <main>
+        <main id="puller-tab" class="tab-content active">
             <div class="search-container">
                 <input type="text" id="dateInput" placeholder="Enter date..." autocomplete="off">
                 <button id="searchBtn" class="primary-btn">Fetch Images</button>
@@ -25,13 +29,38 @@
             <div class="results-container hidden" id="resultsContainer">
                 <div class="results-header">
                     <h2 id="resultsTitle">Images Found: 0</h2>
-                    <button id="downloadBtn" class="primary-btn download-btn">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-                        Download All
-                    </button>
+                    <div style="display: flex; gap: 0.5rem;">
+                        <button id="transferToPrompterBtn" class="primary-btn" style="background-color: #ec4899;">Input for Prompts</button>
+                        <button id="downloadBtn" class="primary-btn download-btn">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                            Download All
+                        </button>
+                    </div>
                 </div>
                 <div class="image-grid" id="imageGrid">
                     <!-- Images will be injected here -->
+                </div>
+            </div>
+        </main>
+
+        <main id="prompter-tab" class="tab-content hidden">
+            <div class="search-container prompter-inputs">
+                <div class="input-group">
+                    <label for="prompterFiles">Upload Images</label>
+                    <input type="file" id="prompterFiles" multiple accept="image/*">
+                </div>
+                <div class="input-group">
+                    <label for="promptCount">Prompts per Image</label>
+                    <input type="number" id="promptCount" value="6" min="1" max="20" class="num-input">
+                </div>
+                <button id="generateBtn" class="primary-btn" style="align-self: flex-end;">Generate Prompts</button>
+            </div>
+
+            <div id="prompterStatus" class="status-message hidden"></div>
+
+            <div class="results-container hidden" id="prompterResultsContainer">
+                <div class="prompter-results-list" id="prompterResultsList">
+                    <!-- Prompts injected here with images -->
                 </div>
             </div>
         </main>

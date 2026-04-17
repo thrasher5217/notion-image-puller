@@ -3,12 +3,18 @@ const express = require('express');
 const cors = require('cors');
 const archiver = require('archiver');
 const path = require('path');
+const fs = require('fs');
+const OpenAI = require('openai');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
+
+const openai = new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY
+});
 app.use(express.static('public'));
 
 const NOTION_KEY = process.env.NOTION_KEY;
@@ -141,6 +147,54 @@ app.post('/api/download', async (req, res) => {
     } catch (e) {
         console.error("ZIP Error:", e);
         if (!res.headersSent) res.status(500).send("Error creating zip");
+    }
+});
+
+app.post('/api/generate-prompts', async (req, res) => {
+    try {
+        const { images, count } = req.body;
+        if (!images || !images.length) return res.status(400).send("No images provided");
+        
+        const promptFilePath = path.join(__dirname, '../New Prompter/Prompt Gen V12.txt');
+        let systemPrompt = '';
+        try {
+            systemPrompt = fs.readFileSync(promptFilePath, 'utf8');
+        } catch (err) {
+            console.error("Could not read Prompt Gen config, falling back to basic prompt.", err);
+            systemPrompt = "Write high quality prompts for the provided image.";
+        }
+        
+        let allResults = [];
+        
+        for (const imgBase64 of images) {
+            const userText = `Test prompt instruction: Please generate exactly ${count || 1} prompts for this product following the system prompt rules closely. Treat this input as the product to examine.`;
+            
+            const response = await openai.chat.completions.create({
+                model: "gpt-4o",
+                messages: [
+                    { role: "system", content: systemPrompt },
+                    {
+                        role: "user",
+                        content: [
+                            { type: "text", text: userText },
+                            { type: "image_url", image_url: { url: imgBase64 } }
+                        ]
+                    }
+                ],
+                max_tokens: 3000
+            });
+            
+            allResults.push({
+                image: imgBase64,
+                promptsText: response.choices[0].message.content
+            });
+        }
+        
+        res.json({ results: allResults });
+        
+    } catch (e) {
+        console.error("OpenAI Error:", e);
+        res.status(500).json({ error: e.message || "Failed to generate prompts." });
     }
 });
 

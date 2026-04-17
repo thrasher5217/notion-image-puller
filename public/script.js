@@ -113,6 +113,134 @@ async function downloadImages() {
     }
 }
 
+// ====== PROMPTER & TABS LOGIC ======
+const tabs = document.querySelectorAll('.tab-btn');
+const tabContents = document.querySelectorAll('.tab-content');
+
+tabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+        tabs.forEach(t => t.classList.remove('active'));
+        tabContents.forEach(c => {
+            c.classList.add('hidden');
+            c.classList.remove('active');
+        });
+        
+        tab.classList.add('active');
+        const target = document.getElementById(tab.dataset.target);
+        target.classList.remove('hidden');
+        target.classList.add('active');
+    });
+});
+
+let prompterImages = [];
+
+const prompterFiles = document.getElementById('prompterFiles');
+const promptCount = document.getElementById('promptCount');
+const generateBtn = document.getElementById('generateBtn');
+const prompterStatus = document.getElementById('prompterStatus');
+const prompterResultsContainer = document.getElementById('prompterResultsContainer');
+const prompterResultsList = document.getElementById('prompterResultsList');
+const transferToPrompterBtn = document.getElementById('transferToPrompterBtn');
+
+function showPrompterStatus(msg, type) {
+    prompterStatus.textContent = msg;
+    prompterStatus.className = `status-message ${type}`;
+    prompterStatus.classList.remove('hidden');
+}
+
+prompterFiles.addEventListener('change', async (e) => {
+    prompterImages = [];
+    const files = Array.from(e.target.files);
+    for (const file of files) {
+        const reader = new FileReader();
+        reader.onload = () => prompterImages.push(reader.result);
+        reader.readAsDataURL(file);
+    }
+    showPrompterStatus(`Loaded ${files.length} images from computer.`, 'success');
+});
+
+if(transferToPrompterBtn) {
+    transferToPrompterBtn.addEventListener('click', () => {
+        if (!currentImages.length) {
+            alert("No images found! Please fetch Notion images first.");
+            return;
+        }
+        prompterImages = [...currentImages];
+        document.querySelector('[data-target="prompter-tab"]').click();
+        showPrompterStatus(`Transferred ${prompterImages.length} images from Notion into Prompter.`, 'success');
+    });
+}
+
+generateBtn.addEventListener('click', async () => {
+    if (!prompterImages.length) {
+        showPrompterStatus("Please upload images or transfer them from Notion first.", "error");
+        return;
+    }
+    
+    generateBtn.disabled = true;
+    generateBtn.textContent = 'Generating...';
+    prompterResultsContainer.classList.add('hidden');
+    prompterResultsList.innerHTML = '';
+    showPrompterStatus('Running OpenAI Vision Prompter...', 'loading');
+    
+    try {
+        const res = await fetch('/api/generate-prompts', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ images: prompterImages, count: promptCount.value || 1 })
+        });
+        
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'API Failed');
+        
+        prompterStatus.classList.add('hidden');
+        prompterResultsContainer.classList.remove('hidden');
+        
+        data.results.forEach((item) => {
+            const group = document.createElement('div');
+            group.className = 'prompt-group';
+            
+            const img = document.createElement('img');
+            img.src = item.image;
+            group.appendChild(img);
+            
+            const matches = [...item.promptsText.matchAll(/```(?:[\w]*\n)?([\s\S]*?)```/g)];
+            if (matches && matches.length > 0) {
+                matches.forEach(m => group.appendChild(createPromptItem(m[1].trim())));
+            } else {
+                group.appendChild(createPromptItem(item.promptsText));
+            }
+            
+            prompterResultsList.appendChild(group);
+        });
+        
+    } catch(err) {
+        showPrompterStatus(err.message, 'error');
+    } finally {
+        generateBtn.disabled = false;
+        generateBtn.textContent = 'Generate Prompts';
+    }
+});
+
+function createPromptItem(text) {
+    const div = document.createElement('div');
+    div.className = 'prompt-item';
+    div.textContent = text;
+    
+    const btn = document.createElement('button');
+    btn.className = 'copy-btn';
+    btn.textContent = 'Copy';
+    btn.onclick = () => {
+        navigator.clipboard.writeText(text);
+        btn.textContent = 'Copied!';
+        btn.classList.add('copied');
+        setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 2000);
+    };
+    
+    div.appendChild(btn);
+    return div;
+}
+
 searchBtn.addEventListener('click', fetchImages);
 dateInput.addEventListener('keypress', (e) => {
     if (e.key === 'Enter') fetchImages();
