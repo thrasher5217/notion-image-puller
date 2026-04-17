@@ -126,20 +126,24 @@ app.post('/api/download', async (req, res) => {
         const archive = archiver('zip', { zlib: { level: 9 } });
         archive.pipe(res);
         
+        const { Readable } = require('stream');
         let count = 1;
         for (const url of images) {
-            const response = await fetch(url);
-            if (response.ok) {
-                const contentType = response.headers.get('content-type') || '';
-                const ext = contentType.includes('png') ? 'png' : 
-                            contentType.includes('webp') ? 'webp' :
-                            contentType.includes('gif') ? 'gif' : 'jpg';
-                const zeroPad = String(count).padStart(3, '0');
-                
-                const arrayBuffer = await response.arrayBuffer();
-                const buffer = Buffer.from(arrayBuffer);
-                archive.append(buffer, { name: `image_${zeroPad}.${ext}` });
-                count++;
+            try {
+                const response = await fetch(url);
+                if (response.ok && response.body) {
+                    const contentType = response.headers.get('content-type') || '';
+                    const ext = contentType.includes('png') ? 'png' : 
+                                contentType.includes('webp') ? 'webp' :
+                                contentType.includes('gif') ? 'gif' : 'jpg';
+                    const zeroPad = String(count).padStart(3, '0');
+                    
+                    const nodeStream = Readable.fromWeb(response.body);
+                    archive.append(nodeStream, { name: `image_${zeroPad}.${ext}` });
+                    count++;
+                }
+            } catch (err) {
+                console.error(`Skipping failed image download: ${url}`, err.message);
             }
         }
         
